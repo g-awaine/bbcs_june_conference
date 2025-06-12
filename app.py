@@ -373,6 +373,8 @@ class SatayGesture():
             return False
         
 
+        
+
 # Initialise HappyGesture object
 happy_gesture = HappyGesture()
 
@@ -411,8 +413,18 @@ while True:
     right_pointing = False
     is_good_morning = False
     is_happy = False
+    is_eating = False # New variable for eating gesture
     is_breakfast = False
-
+    face_nose_tip = None
+    if results_face.detections:
+        for detection in results_face.detections:
+            # The nose tip is landmark 2 in MediaPipe Face Detection
+            nose_tip_lm = detection.location_data.relative_keypoints[2]
+            # ONLY use x, y for face_nose_tip as MediaPipe Face Detection does not provide z
+            face_nose_tip = (nose_tip_lm.x, nose_tip_lm.y) 
+            
+            # Optionally draw face landmarks (for debugging)
+            # mp_drawing.draw_detection(processed_frame, detection)
     if results.pose_landmarks:
         landmarks = results.pose_landmarks.landmark
 
@@ -433,35 +445,35 @@ while True:
             (left_mouth.z + right_mouth.z) / 2,
         ])
 
-        # # Check pointing if the index, elbow and shoulder landmarks are available
-        # required_landmarks = [
-        #     mp_pose.PoseLandmark.LEFT_INDEX,
-        #     mp_pose.PoseLandmark.LEFT_ELBOW,
-        #     mp_pose.PoseLandmark.LEFT_SHOULDER,
-        # ]
-        # if check_landmarks(landmarks, required_landmarks):
-        #     left_pointing = is_pointing_to_chest(
-        #         landmarks,
-        #         mp_pose.PoseLandmark.LEFT_INDEX,
-        #         mp_pose.PoseLandmark.LEFT_ELBOW,
-        #         mp_pose.PoseLandmark.LEFT_SHOULDER,
-        #         chest_center
-        #     )
+        # Check pointing if the index, elbow and shoulder landmarks are available
+        required_landmarks = [
+            mp_pose.PoseLandmark.LEFT_INDEX,
+            mp_pose.PoseLandmark.LEFT_ELBOW,
+            mp_pose.PoseLandmark.LEFT_SHOULDER,
+        ]
+        if check_landmarks(landmarks, required_landmarks):
+            left_pointing = is_pointing_to_chest(
+                landmarks,
+                mp_pose.PoseLandmark.LEFT_INDEX,
+                mp_pose.PoseLandmark.LEFT_ELBOW,
+                mp_pose.PoseLandmark.LEFT_SHOULDER,
+                chest_center
+            )
              
-        # # Check pointing if the index, elbow and shoulder landmarks are available
-        # required_landmarks = [
-        #     mp_pose.PoseLandmark.RIGHT_INDEX,
-        #     mp_pose.PoseLandmark.RIGHT_ELBOW,
-        #     mp_pose.PoseLandmark.RIGHT_SHOULDER,
-        # ]
-        # if check_landmarks(landmarks, required_landmarks):
-        #     right_pointing = is_pointing_to_chest(
-        #         landmarks,
-        #         mp_pose.PoseLandmark.RIGHT_INDEX,
-        #         mp_pose.PoseLandmark.RIGHT_ELBOW,
-        #         mp_pose.PoseLandmark.RIGHT_SHOULDER,
-        #         chest_center
-        #     )
+        # Check pointing if the index, elbow and shoulder landmarks are available
+        required_landmarks = [
+            mp_pose.PoseLandmark.RIGHT_INDEX,
+            mp_pose.PoseLandmark.RIGHT_ELBOW,
+            mp_pose.PoseLandmark.RIGHT_SHOULDER,
+        ]
+        if check_landmarks(landmarks, required_landmarks):
+            right_pointing = is_pointing_to_chest(
+                landmarks,
+                mp_pose.PoseLandmark.RIGHT_INDEX,
+                mp_pose.PoseLandmark.RIGHT_ELBOW,
+                mp_pose.PoseLandmark.RIGHT_SHOULDER,
+                chest_center
+            )
 
         
         # required_landmarks = [
@@ -478,22 +490,22 @@ while True:
         #         chest_center
         #     )
 
-        # required_landmarks = [
-        #     mp_pose.PoseLandmark.RIGHT_WRIST,
-        #     mp_pose.PoseLandmark.RIGHT_ELBOW,
-        #     mp_pose.PoseLandmark.RIGHT_SHOULDER,
-        #     mp_pose.PoseLandmark.RIGHT_HIP,
-        # ]
-        # if check_landmarks(landmarks, required_landmarks):
-        #     is_happy = happy_gesture.check_frame(
-        #         frame_count,
-        #         landmarks,
-        #         mp_pose.PoseLandmark.RIGHT_WRIST,
-        #         mp_pose.PoseLandmark.RIGHT_ELBOW,
-        #         mp_pose.PoseLandmark.RIGHT_SHOULDER,
-        #         mp_pose.PoseLandmark.RIGHT_HIP,
-        #         chest_center
-        #     )
+        required_landmarks = [
+            mp_pose.PoseLandmark.RIGHT_WRIST,
+            mp_pose.PoseLandmark.RIGHT_ELBOW,
+            mp_pose.PoseLandmark.RIGHT_SHOULDER,
+            mp_pose.PoseLandmark.RIGHT_HIP,
+        ]
+        if check_landmarks(landmarks, required_landmarks):
+            is_happy = happy_gesture.check_frame(
+                frame_count,
+                landmarks,
+                mp_pose.PoseLandmark.RIGHT_WRIST,
+                mp_pose.PoseLandmark.RIGHT_ELBOW,
+                mp_pose.PoseLandmark.RIGHT_SHOULDER,
+                mp_pose.PoseLandmark.RIGHT_HIP,
+                chest_center
+            )
 
 
         required_landmarks = [
@@ -554,17 +566,16 @@ while True:
 
             mp_drawing.draw_landmarks(processed_frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
 
-    # Display eating gesture status outside the hand loop
-    if is_eating:
-        cv2.putText(processed_frame, "Eating Gesture Detected", (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 3)
-    else:
-        cv2.putText(processed_frame, "Not Eating", (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
 
     if is_breakfast:
         cv2.putText(processed_frame, "Breakfast", (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
         text_list.append("Breakfast ")
     else:
         cv2.putText(processed_frame, "Not Breakfast", (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+    if is_eating:
+        cv2.putText(processed_frame, "Eating Gesture Detected", (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 3)
+    else:
+        cv2.putText(processed_frame, "Not Eating", (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
 
 
     # Pass the raw text into the large language model
