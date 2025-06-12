@@ -215,7 +215,169 @@ class HappyGesture():
 
         return dist_wrist_to_shoulder < dist_threshold and is_shoulder_angled
     
+
+class BreakfastGesture():
+    def __init__(self):
+        self.phase = 0
+        self.waiting_count = 0
+
+    def reinitialise(self):
+        self.phase = 0
+        self.waiting_count = 0
+
+    def check_frame(self, frame_count, landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold=0.04, min_shoulder_angle=0, max_shoulder_angle=20):
+        is_up_position = self.identify_up_position(landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold, min_shoulder_angle, max_shoulder_angle)
+        is_down_position = self.identify_down_position(landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold, min_shoulder_angle, max_shoulder_angle)
+
+        # If the up position was found on the even phases increment phase to next phase i.e. the phase where he now lowers his hand to chin
+        if is_up_position and (self.phase % 2 == 0):
+            self.phase += 1
+            self.waiting_count = 0
+            print("now at phase:", self.phase)
+
+        # If the down position was found on the odd phases increment phase to next phase i.e. the phase where he now lifts his hand to mouth
+        elif is_down_position and (self.phase % 2 == 1):
+            self.phase += 1
+            self.waiting_count = 0
+            print("now at phase:", self.phase)
+
+        # Increment the waiting count while waiting for next phase 
+        elif self.phase > 0:
+            self.waiting_count += 1
+
+        # If phase is 0 (didnt identify the first up position) then make waiting count 0
+        elif self.phase == 0:
+            self.waiting_count = 0
+
+
+        # Check if waiting_count exceeds the waiting frames that is allowed
+        if self.waiting_count > 60:
+            # Assume the breakfast gesture was not successful
+            print("Too long to continue", "phase: ", self.phase)
+            self.reinitialise()
+
+        # Check if the phase is 5 (meaning the full gesture was accomplished)
+        if self.phase == 4:
+            print("Breakfast was detected-----------------------------------")
+            self.reinitialise()
+            return True
+        
+        else:
+            return False
+
+
+    def identify_up_position(self, landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold, min_shoulder_angle, max_shoulder_angle):
+        index_finger = landmarks[index_finger_id]
+        elbow = landmarks[elbow_id]
+        shoulder = landmarks[shoulder_id]
+        hip = landmarks[hip_id]
+
+        mouth_right = landmarks[mouth_right_id]
+        mouth_left = landmarks[mouth_left_id]
+        mouth_center = np.array([
+            (mouth_right.x + mouth_left.x) / 2,
+            (mouth_right.y + mouth_left.y) / 2,
+            (mouth_right.z + mouth_left.z) / 2
+        ])
+
+        index_finger_xyz = np.array([index_finger.x, index_finger.y, index_finger.z])
+        elbow_xyz = np.array([elbow.x, elbow.y, elbow.z])
+        shoulder_xyz = np.array([shoulder.x, shoulder.y, shoulder.z])
+        hip_xyz = np.array([hip.x, hip.y, hip.z])
+
+        # Get distance from index finger to mouth centre
+        dist_index_finger_to_mouth = np.linalg.norm(index_finger_xyz[:2] - mouth_center[:2])
+
+        # Ensure shoulder is angled between the specified angles
+        shoulder_angle = calculate_angle(hip_xyz, shoulder_xyz, elbow_xyz)
+        is_shoulder_angled = min_shoulder_angle < shoulder_angle < max_shoulder_angle
+
+        return dist_index_finger_to_mouth < dist_threshold and is_shoulder_angled
+
+    def identify_down_position(self, landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold, min_shoulder_angle, max_shoulder_angle):
+        index_finger = landmarks[index_finger_id]
+        elbow = landmarks[elbow_id]
+        shoulder = landmarks[shoulder_id]
+        hip = landmarks[hip_id]
+
+        mouth_right = landmarks[mouth_right_id]
+        mouth_left = landmarks[mouth_left_id]
+        mouth_center = np.array([
+            (mouth_right.x + mouth_left.x) / 2,
+            (mouth_right.y + mouth_left.y) / 2,
+            (mouth_right.z + mouth_left.z) / 2
+        ])
+
+        index_finger_xyz = np.array([index_finger.x, index_finger.y, index_finger.z])
+        elbow_xyz = np.array([elbow.x, elbow.y, elbow.z])
+        shoulder_xyz = np.array([shoulder.x, shoulder.y, shoulder.z])
+        hip_xyz = np.array([hip.x, hip.y, hip.z])
+
+        # Get distance from index finger to chest centre
+        dist_index_finger_to_chest = np.linalg.norm(index_finger_xyz[:2] - chest_point[:2])
+
+        # Ensure shoulder is angled between the specified angles
+        shoulder_angle = calculate_angle(hip_xyz, shoulder_xyz, elbow_xyz)
+        is_shoulder_angled = min_shoulder_angle < shoulder_angle < max_shoulder_angle
+
+        return dist_index_finger_to_chest < dist_threshold and is_shoulder_angled
+
+
+class SatayGesture():
+    def __init__(self):
+        self.phase = 0
+        self.waiting_count = 0
+
+    def reinitialise(self):
+        self.phase = 0
+        self.waiting_count = 0
+
+    def check_frame(self, frame_count, landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold=0.04, min_shoulder_angle=0, max_shoulder_angle=20):
+        is_inner_position = self.identify_inner_position(landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold, min_shoulder_angle, max_shoulder_angle)
+        is_outer_position = self.identify_outer_position(landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold, min_shoulder_angle, max_shoulder_angle)
+
+        # If the up position was found on the even phases increment phase to next phase i.e. the phase where he now lowers his hand to chin
+        if is_inner_position and (self.phase % 2 == 0):
+            self.phase += 1
+            self.waiting_count = 0
+            print("now at phase:", self.phase)
+
+        # If the down position was found on the odd phases increment phase to next phase i.e. the phase where he now lifts his hand to mouth
+        elif is_outer_position and (self.phase % 2 == 1):
+            self.phase += 1
+            self.waiting_count = 0
+            print("now at phase:", self.phase)
+
+        # Increment the waiting count while waiting for next phase 
+        elif self.phase > 0:
+            self.waiting_count += 1
+
+        # If phase is 0 (didnt identify the first up position) then make waiting count 0
+        elif self.phase == 0:
+            self.waiting_count = 0
+
+
+        # Check if waiting_count exceeds the waiting frames that is allowed
+        if self.waiting_count > 60:
+            # Assume the breakfast gesture was not successful
+            print("Too long to continue", "phase: ", self.phase)
+            self.reinitialise()
+
+        # Check if the phase is 5 (meaning the full gesture was accomplished)
+        if self.phase == 3:
+            print("Satay was detected-----------------------------------")
+            self.reinitialise()
+            return True
+        
+        else:
+            return False
+        
+
+# Initialise HappyGesture object
 happy_gesture = HappyGesture()
+
+# Initialise BreakfastGesture object
+breakfast_gesture = BreakfastGesture()
 
 if not cap.isOpened():
     print("Error: Could not access the webcam.")
@@ -249,53 +411,119 @@ while True:
     right_pointing = False
     is_good_morning = False
     is_happy = False
-    is_eating = False # New variable for eating gesture
-
-    face_nose_tip = None
-    if results_face.detections:
-        for detection in results_face.detections:
-            # The nose tip is landmark 2 in MediaPipe Face Detection
-            nose_tip_lm = detection.location_data.relative_keypoints[2]
-            # ONLY use x, y for face_nose_tip as MediaPipe Face Detection does not provide z
-            face_nose_tip = (nose_tip_lm.x, nose_tip_lm.y) 
-            
-            # Optionally draw face landmarks (for debugging)
-            # mp_drawing.draw_detection(processed_frame, detection)
-
+    is_breakfast = False
 
     if results.pose_landmarks:
         landmarks = results.pose_landmarks.landmark
 
+        # Get shoulders and mouth
         left_shoulder = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER]
         right_shoulder = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER]
+        left_mouth = landmarks[mp_pose.PoseLandmark.MOUTH_LEFT]
+        right_mouth = landmarks[mp_pose.PoseLandmark.MOUTH_RIGHT]
 
         chest_center = np.array([
             (left_shoulder.x + right_shoulder.x) / 2,
             (left_shoulder.y + right_shoulder.y) / 2,
             (left_shoulder.z + right_shoulder.z) / 2,
         ])
+        mouth_center = np.array([
+            (left_mouth.x + right_mouth.x) / 2,
+            (left_mouth.y + right_mouth.y) / 2,
+            (left_mouth.z + right_mouth.z) / 2,
+        ])
+
+        # # Check pointing if the index, elbow and shoulder landmarks are available
+        # required_landmarks = [
+        #     mp_pose.PoseLandmark.LEFT_INDEX,
+        #     mp_pose.PoseLandmark.LEFT_ELBOW,
+        #     mp_pose.PoseLandmark.LEFT_SHOULDER,
+        # ]
+        # if check_landmarks(landmarks, required_landmarks):
+        #     left_pointing = is_pointing_to_chest(
+        #         landmarks,
+        #         mp_pose.PoseLandmark.LEFT_INDEX,
+        #         mp_pose.PoseLandmark.LEFT_ELBOW,
+        #         mp_pose.PoseLandmark.LEFT_SHOULDER,
+        #         chest_center
+        #     )
+             
+        # # Check pointing if the index, elbow and shoulder landmarks are available
+        # required_landmarks = [
+        #     mp_pose.PoseLandmark.RIGHT_INDEX,
+        #     mp_pose.PoseLandmark.RIGHT_ELBOW,
+        #     mp_pose.PoseLandmark.RIGHT_SHOULDER,
+        # ]
+        # if check_landmarks(landmarks, required_landmarks):
+        #     right_pointing = is_pointing_to_chest(
+        #         landmarks,
+        #         mp_pose.PoseLandmark.RIGHT_INDEX,
+        #         mp_pose.PoseLandmark.RIGHT_ELBOW,
+        #         mp_pose.PoseLandmark.RIGHT_SHOULDER,
+        #         chest_center
+        #     )
+
         
+        # required_landmarks = [
+        #     mp_pose.PoseLandmark.RIGHT_WRIST,
+        #     mp_pose.PoseLandmark.RIGHT_ELBOW,
+        #     mp_pose.PoseLandmark.RIGHT_SHOULDER,
+        # ]
+        # if check_landmarks(landmarks, required_landmarks):
+        #     is_good_morning = good_morning(
+        #         landmarks,
+        #         mp_pose.PoseLandmark.RIGHT_INDEX,
+        #         mp_pose.PoseLandmark.RIGHT_ELBOW,
+        #         mp_pose.PoseLandmark.RIGHT_SHOULDER,
+        #         chest_center
+        #     )
+
+        # required_landmarks = [
+        #     mp_pose.PoseLandmark.RIGHT_WRIST,
+        #     mp_pose.PoseLandmark.RIGHT_ELBOW,
+        #     mp_pose.PoseLandmark.RIGHT_SHOULDER,
+        #     mp_pose.PoseLandmark.RIGHT_HIP,
+        # ]
+        # if check_landmarks(landmarks, required_landmarks):
+        #     is_happy = happy_gesture.check_frame(
+        #         frame_count,
+        #         landmarks,
+        #         mp_pose.PoseLandmark.RIGHT_WRIST,
+        #         mp_pose.PoseLandmark.RIGHT_ELBOW,
+        #         mp_pose.PoseLandmark.RIGHT_SHOULDER,
+        #         mp_pose.PoseLandmark.RIGHT_HIP,
+        #         chest_center
+        #     )
+
+
         required_landmarks = [
-            mp_pose.PoseLandmark.RIGHT_WRIST,
+            mp_pose.PoseLandmark.RIGHT_INDEX,
             mp_pose.PoseLandmark.RIGHT_ELBOW,
             mp_pose.PoseLandmark.RIGHT_SHOULDER,
             mp_pose.PoseLandmark.RIGHT_HIP,
+            mp_pose.PoseLandmark.MOUTH_RIGHT,
+            mp_pose.PoseLandmark.MOUTH_LEFT
         ]
         if check_landmarks(landmarks, required_landmarks):
-            is_happy = happy_gesture.check_frame(
+            is_breakfast = breakfast_gesture.check_frame(
                 frame_count,
                 landmarks,
-                mp_pose.PoseLandmark.RIGHT_WRIST,
+                mp_pose.PoseLandmark.RIGHT_INDEX,
                 mp_pose.PoseLandmark.RIGHT_ELBOW,
                 mp_pose.PoseLandmark.RIGHT_SHOULDER,
                 mp_pose.PoseLandmark.RIGHT_HIP,
+                mp_pose.PoseLandmark.MOUTH_RIGHT,
+                mp_pose.PoseLandmark.MOUTH_LEFT,
                 chest_center
             )
-        
+
+        # Draw pose
         mp_drawing.draw_landmarks(processed_frame, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
 
         chest_pixel = (int(chest_center[0] * w), int(chest_center[1] * h))
+        mouth_pixel = (int(mouth_center[0] * w), int(mouth_center[1] * h))
         cv2.circle(processed_frame, chest_pixel, 2, (255, 255, 0))
+        cv2.circle(processed_frame, mouth_pixel, 2, (255, 255, 0))
 
         if left_pointing or right_pointing:
             cv2.putText(processed_frame, "Pointing to Chest", (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
@@ -332,6 +560,14 @@ while True:
     else:
         cv2.putText(processed_frame, "Not Eating", (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
 
+    if is_breakfast:
+        cv2.putText(processed_frame, "Breakfast", (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
+        text_list.append("Breakfast ")
+    else:
+        cv2.putText(processed_frame, "Not Breakfast", (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+
+
+    # Pass the raw text into the large language model
 
     cv2.imshow("Image", processed_frame)
 
