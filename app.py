@@ -316,9 +316,9 @@ class SatayGesture():
         self.phase = 0
         self.waiting_count = 0
 
-    def check_frame(self, frame_count, landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold=0.04, min_shoulder_angle=0, max_shoulder_angle=20):
-        is_inner_position = self.identify_inner_position(landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold, min_shoulder_angle, max_shoulder_angle)
-        is_outer_position = self.identify_outer_position(landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold, min_shoulder_angle, max_shoulder_angle)
+    def check_frame(self, frame_count, landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, dist_threshold=0.03, min_shoulder_angle=75, max_shoulder_angle=105):
+        is_inner_position = self.identify_inner_position(landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, dist_threshold, min_shoulder_angle, max_shoulder_angle)
+        is_outer_position = self.identify_outer_position(landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, dist_threshold, min_shoulder_angle, max_shoulder_angle)
 
         # If the up position was found on the even phases increment phase to next phase i.e. the phase where he now lowers his hand to chin
         if is_inner_position and (self.phase % 2 == 0):
@@ -355,13 +355,59 @@ class SatayGesture():
         
         else:
             return False
-        
+
+    def identify_inner_position(self, landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, dist_threshold, min_shoulder_angle, max_shoulder_angle):
+        index_finger = landmarks[index_finger_id]
+        elbow = landmarks[elbow_id]
+        shoulder = landmarks[shoulder_id]
+        hip = landmarks[hip_id]
+        mouth_right = landmarks[mouth_right_id]
+
+        index_finger_xyz = np.array([index_finger.x, index_finger.y, index_finger.z])
+        elbow_xyz = np.array([elbow.x, elbow.y, elbow.z])
+        shoulder_xyz = np.array([shoulder.x, shoulder.y, shoulder.z])
+        hip_xyz = np.array([hip.x, hip.y, hip.z])
+        mouth_right_xyz = np.array([mouth_right.x, mouth_right.y, mouth_right.z])
+
+        # Get distance from index finger to mouth right
+        dist_index_finger_to_mouth_right = np.linalg.norm(index_finger_xyz[:2] - mouth_right_xyz[:2])
+
+        # Ensure shoulder is angled between the specified angles
+        shoulder_angle = calculate_angle(hip_xyz, shoulder_xyz, elbow_xyz)
+        is_shoulder_angled = min_shoulder_angle < shoulder_angle < max_shoulder_angle
+
+        return dist_index_finger_to_mouth_right < dist_threshold and is_shoulder_angled
+
+    def identify_outer_position(self, landmarks, index_finger_id, elbow_id, shoulder_id, hip_id, mouth_right_id, dist_threshold, min_shoulder_angle, max_shoulder_angle):
+        index_finger = landmarks[index_finger_id]
+        elbow = landmarks[elbow_id]
+        shoulder = landmarks[shoulder_id]
+        hip = landmarks[hip_id]
+        mouth_right = landmarks[mouth_right_id]
+
+        index_finger_xyz = np.array([index_finger.x, index_finger.y, index_finger.z])
+        elbow_xyz = np.array([elbow.x, elbow.y, elbow.z])
+        shoulder_xyz = np.array([shoulder.x, shoulder.y, shoulder.z])
+        hip_xyz = np.array([hip.x, hip.y, hip.z])
+        outer_position_xyz = np.array([shoulder.x, mouth_right.y, mouth_right.z])
+
+        # Get distance from index finger to outer position
+        dist_index_finger_to_outer_pos = np.linalg.norm(index_finger_xyz[:2] - outer_position_xyz[:2])
+
+        # Ensure shoulder is angled between the specified angles
+        shoulder_angle = calculate_angle(hip_xyz, shoulder_xyz, elbow_xyz)
+        is_shoulder_angled = min_shoulder_angle < shoulder_angle < max_shoulder_angle
+
+        return dist_index_finger_to_outer_pos < dist_threshold and is_shoulder_angled
 
 # Initialise HappyGesture object
 happy_gesture = HappyGesture()
 
 # Initialise BreakfastGesture object
 breakfast_gesture = BreakfastGesture()
+
+# Initialise SatayGesture object
+satay_gesture = SatayGesture()
 
 if not cap.isOpened():
     print("Error: Could not access the webcam.")
@@ -399,6 +445,7 @@ while True:
     is_good_morning = False
     is_happy = False
     is_breakfast = False
+    is_satay = False
 
     if results.pose_landmarks:
         landmarks = results.pose_landmarks.landmark
@@ -484,25 +531,43 @@ while True:
         #     )
 
 
+        # required_landmarks = [
+        #     mp_pose.PoseLandmark.RIGHT_INDEX,
+        #     mp_pose.PoseLandmark.RIGHT_ELBOW,
+        #     mp_pose.PoseLandmark.RIGHT_SHOULDER,
+        #     mp_pose.PoseLandmark.RIGHT_HIP,
+        #     mp_pose.PoseLandmark.MOUTH_RIGHT,
+        #     mp_pose.PoseLandmark.MOUTH_LEFT
+        # ]
+        # if check_landmarks(landmarks, required_landmarks):
+        #     is_breakfast = breakfast_gesture.check_frame(
+        #         frame_count,
+        #         landmarks,
+        #         mp_pose.PoseLandmark.RIGHT_INDEX,
+        #         mp_pose.PoseLandmark.RIGHT_ELBOW,
+        #         mp_pose.PoseLandmark.RIGHT_SHOULDER,
+        #         mp_pose.PoseLandmark.RIGHT_HIP,
+        #         mp_pose.PoseLandmark.MOUTH_RIGHT,
+        #         mp_pose.PoseLandmark.MOUTH_LEFT,
+        #         chest_center
+        #     )
+
         required_landmarks = [
             mp_pose.PoseLandmark.RIGHT_INDEX,
             mp_pose.PoseLandmark.RIGHT_ELBOW,
             mp_pose.PoseLandmark.RIGHT_SHOULDER,
             mp_pose.PoseLandmark.RIGHT_HIP,
-            mp_pose.PoseLandmark.MOUTH_RIGHT,
-            mp_pose.PoseLandmark.MOUTH_LEFT
+            mp_pose.PoseLandmark.MOUTH_RIGHT
         ]
         if check_landmarks(landmarks, required_landmarks):
-            is_breakfast = breakfast_gesture.check_frame(
+            is_satay = satay_gesture.check_frame(
                 frame_count,
                 landmarks,
                 mp_pose.PoseLandmark.RIGHT_INDEX,
                 mp_pose.PoseLandmark.RIGHT_ELBOW,
                 mp_pose.PoseLandmark.RIGHT_SHOULDER,
                 mp_pose.PoseLandmark.RIGHT_HIP,
-                mp_pose.PoseLandmark.MOUTH_RIGHT,
-                mp_pose.PoseLandmark.MOUTH_LEFT,
-                chest_center
+                mp_pose.PoseLandmark.MOUTH_RIGHT
             )
 
         # Draw pose
@@ -540,6 +605,12 @@ while True:
             text_list.append("Breakfast ")
         else:
             cv2.putText(processed_frame, "Not Breakfast", (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+
+        if is_satay:
+            cv2.putText(processed_frame, "Satay", (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
+            text_list.append("Satay ")
+        else:
+            cv2.putText(processed_frame, "Not Satay", (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
 
 
     # Pass the raw text into the large language model
