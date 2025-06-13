@@ -783,7 +783,7 @@ while True:
         last_activity_time = time.time()
 
     if time.time() - last_activity_time > 3 and text_list:
-        process_and_speak(text_list, send=False)
+        process_and_speak(text_list, send=True)
         text_list = []
         last_activity_time = time.time() 
 
