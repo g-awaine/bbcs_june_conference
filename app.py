@@ -92,7 +92,7 @@ class MorningGesture():
     def reinitialise(self):
         self.waiting_count = 0
     
-    def check_frame(self, landmarks, wrist_id, elbow_id, shoulder_id, chest_point, dist_threshold=0.13, min_elbow_angle=0, max_elbow_angle=10, min_shoulder_angle=0, max_shoulder_angle=20):
+    def check_frame(self, landmarks, wrist_id, elbow_id, shoulder_id, chest_point, dist_threshold=0.135, min_elbow_angle=0, max_elbow_angle=25, min_shoulder_angle=0, max_shoulder_angle=25):
         is_good_morning = self.identify_good_morning(landmarks, wrist_id, elbow_id, shoulder_id, chest_point, dist_threshold, min_elbow_angle, max_elbow_angle, min_shoulder_angle, max_shoulder_angle)
         
         if is_good_morning:
@@ -100,7 +100,7 @@ class MorningGesture():
         else:
             self.reinitialise()
 
-        if self.waiting_count >= 6:
+        if self.waiting_count >= 8:
             return True
         else:
             return False
@@ -140,7 +140,7 @@ class HappyGesture():
         self.count = 0
         self.happy_detected = False
     
-    def check_frame(self, frame_count, landmarks, hand_points, index_finger_id, elbow_id, shoulder_id, dist_threshold=0.08, min_shoulder_angle=20, max_shoulder_angle=70):
+    def check_frame(self, frame_count, landmarks, hand_points, index_finger_id, elbow_id, shoulder_id, dist_threshold=0.1, min_shoulder_angle=20, max_shoulder_angle=70):
         is_happy = self.identify_happy_gesture(landmarks, hand_points, index_finger_id, elbow_id, shoulder_id, dist_threshold, min_shoulder_angle, max_shoulder_angle)
 
         if self.happy_detected == True and is_happy == True:
@@ -152,7 +152,7 @@ class HappyGesture():
     
         elif self.found_start_frame and is_happy:
             self.count += 1
-            if self.count >= 15:
+            if self.count >= 13:
                 self.happy_detected = True
                 return True
 
@@ -298,7 +298,7 @@ class SatayGesture():
         self.phase = 0
         self.waiting_count = 0
 
-    def check_frame(self, frame_count, landmarks, index_finger_id, elbow_id, shoulder_id, mouth_right_id, dist_threshold=0.12, min_shoulder_angle=20, max_shoulder_angle=70):
+    def check_frame(self, frame_count, landmarks, index_finger_id, elbow_id, shoulder_id, mouth_right_id, dist_threshold=0.123, min_shoulder_angle=20, max_shoulder_angle=90):
         is_inner_position = self.identify_inner_position(landmarks, index_finger_id, elbow_id, shoulder_id, mouth_right_id, dist_threshold, min_shoulder_angle, max_shoulder_angle)
         is_outer_position = self.identify_outer_position(landmarks, index_finger_id, elbow_id, shoulder_id, mouth_right_id, dist_threshold, min_shoulder_angle, max_shoulder_angle)
 
@@ -329,7 +329,7 @@ class SatayGesture():
             self.reinitialise()
 
         # Check if the phase is 5 (meaning the full gesture was accomplished)
-        if self.phase == 4:
+        if self.phase == 5:
             print("Satay was detected-----------------------------------")
             self.reinitialise()
             return True
@@ -392,7 +392,7 @@ class EatingGesture():
     def __init__(self):
         self.is_eating_detected = False
         self.consecutive_frames = 0
-        self.required_consecutive_frames = 0 # Adjust as needed (e.g., 15-30 frames)
+        self.required_consecutive_frames = 11 # Adjust as needed (e.g., 15-30 frames)
         self.last_detection_frame = 0
 
     def reinitialise(self):
@@ -445,9 +445,9 @@ class EatingGesture():
 
         # Combined conditions for eating gesture
         return (
-            thumb_index_dist < 0.18 and
-            index_middle_dist < 0.18 and
-            wrist_to_index < 0.26 and
+            thumb_index_dist < 0.15 and
+            index_middle_dist < 0.15 and
+            wrist_to_index < 0.2 and
             is_near_face and
             is_above_chest and
             is_shoulder_angled
