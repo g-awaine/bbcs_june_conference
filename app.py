@@ -82,7 +82,7 @@ def is_pointing_to_chest(landmarks, index_finger_id, elbow_id, shoulder_id, ches
     
     return dist_index_to_chest < dist_threshold and is_forward and is_elbow_bent and is_index_finger_below_chest
 
-def is_eating_gesture(hand_landmarks_list, face_nose_tip, face_proximity_threshold=0.3):
+def is_eating_gesture(hand_landmarks_list, face_nose_tip, face_proximity_threshold=0.25):
     # hand_landmarks_list will be a list of (x, y, z) tuples for all 21 hand landmarks
     # face_nose_tip will be an (x, y) tuple for the nose tip (no z for face detection)
 
@@ -661,3 +661,45 @@ pose.close() # Close pose
 face_detection.close() # Close face detection
 cap.release()
 cv2.destroyAllWindows()
+
+
+import requests
+import os
+import sys
+from gemini import askGemini
+
+def process_and_speak(words):
+    """
+    Takes a list of words, sends them to askGemini, and passes the response to the TTS endpoint.
+    
+    Args:
+        words (list of str): The list of input words.
+    """
+    if not words:
+        print("No words provided.")
+        return
+
+    input_text = " ".join(words)
+    print(f"[Gemini] Sending input: {input_text}")
+    
+    gemini_response = askGemini(input_text)
+    
+    if not gemini_response:
+        print("Gemini response is empty. Exiting.")
+        return
+
+    print(f"[Gemini] Response received: {gemini_response}")
+
+    # Prepare TTS request
+    tts_url = "http://localhost:5001/speak"
+    payload = {"text": gemini_response}
+    headers = {"Content-Type": "application/json"}
+
+    print(f"[TTS] Sending request with text: {gemini_response}")
+    response = requests.post(tts_url, json=payload, headers=headers)
+
+    if response.status_code == 200:
+        print("[TTS] Response:", response.json())
+    else:
+        print(f"[TTS] Failed with status code {response.status_code}")
+        print("[TTS] Response:", response.text)
