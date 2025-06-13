@@ -6,6 +6,7 @@ import requests
 import os
 import sys
 from gemini import askGemini
+import threading
 
 new_frame_height = 640
 new_frame_width = 800
@@ -43,62 +44,6 @@ def calculate_angle(point1, point2, point3):
     cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
     angle_rad = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
     return np.degrees(angle_rad)
-
-
-# def is_eating_gesture(landmarks, hand_landmarks_list, elbow_id, shoulder_id, chest_point, face_nose_tip, face_proximity_threshold=0.4, min_shoulder_angle=60, max_shoulder_angle=95):
-    # hand_landmarks_list will be a list of (x, y, z) tuples for all 21 hand landmarks
-    # face_nose_tip will be an (x, y) tuple for the nose tip (no z for face detection)
-
-#     def distance_2d(a, b):
-#         # Calculate 2D distance for proximity check
-#         return ((a[0] - b[0])**2 + (a[1] - b[1])**2) ** 0.5
-
-#     def distance_3d(a, b):
-#         # Calculate 3D distance for hand gesture specifics
-#         return ((a[0] - b[0])**2 + (a[1] - b[1])**2 + (a[2] - b[2])**2) ** 0.5
-
-#     # Check if we have enough landmarks for both hand and face
-#     if len(hand_landmarks_list) < 21 or face_nose_tip is None:
-#         return False
-
-#     wrist = hand_landmarks_list[0]
-#     index_tip = hand_landmarks_list[8]
-#     thumb_tip = hand_landmarks_list[4]
-#     middle_tip = hand_landmarks_list[12]
-    
-#     thumb_index_dist = distance_3d(thumb_tip, index_tip)
-#     index_middle_dist = distance_3d(index_tip, middle_tip)
-#     wrist_to_index = distance_3d(wrist, index_tip)
-
-#     # Check if hand is near the face (using wrist as the reference for the hand, and only 2D for face)
-#     # We pass only x,y for wrist to distance_2d
-#     hand_to_face_dist = distance_2d((wrist[0], wrist[1]), face_nose_tip)
-#     is_near_face = hand_to_face_dist < face_proximity_threshold # Adjust this threshold as needed
-
-
-    # elbow = landmarks[elbow_id]
-    # shoulder = landmarks[shoulder_id]
-
-    # elbow_xyz = np.array([elbow.x, elbow.y, elbow.z])
-    # shoulder_xyz = np.array([shoulder.x, shoulder.y, shoulder.z])
-    # hip_xyz = np.array([shoulder.x, new_frame_height, shoulder.z])
-
-    # vertical_diff = chest_point[1] - index_tip[1]
-    # is_above_chest = 0 < vertical_diff < 2
-
-    # shoulder_angle = calculate_angle(hip_xyz, shoulder_xyz, elbow_xyz)
-    # is_shoulder_angled = min_shoulder_angle < shoulder_angle < max_shoulder_angle
-
-    
-    # # Combined conditions for eating gesture
-    # return (
-    #     thumb_index_dist < 0.16 and
-    #     index_middle_dist < 0.16 and
-    #     wrist_to_index < 0.24 and
-    #     is_near_face and
-    #     is_above_chest and
-    #     is_shoulder_angled
-    # )
 
 class PointChestGesture():
     def __init__(self):
@@ -508,7 +453,7 @@ class EatingGesture():
             is_shoulder_angled
         )
 
-    def check_frame(self, frame_count, landmarks, hand_landmarks_list, elbow_id, shoulder_id, chest_point, face_nose_tip, face_proximity_threshold=0.4, min_shoulder_angle=60, max_shoulder_angle=95):
+    def check_frame(self, frame_count, landmarks, hand_landmarks_list, elbow_id, shoulder_id, chest_point, face_nose_tip, face_proximity_threshold=0.4, min_shoulder_angle=45, max_shoulder_angle=95):
         current_eating_condition = self._check_eating_condition(landmarks, hand_landmarks_list, elbow_id, shoulder_id, chest_point, face_nose_tip, face_proximity_threshold, min_shoulder_angle, max_shoulder_angle)
 
         if current_eating_condition:
@@ -545,6 +490,14 @@ satay_gesture = SatayGesture()
 # Initialise EatingGesture object
 eating_gesture = EatingGesture()
 
+def post_request(tts_url, payload, headers):
+    response = requests.post(tts_url, json=payload, headers=headers)
+    if response.status_code == 200:
+        print("[TTS] Response:", response.json())
+    else:
+        print(f"[TTS] Failed with status code {response.status_code}")
+        print("[TTS] Response:", response.text)
+
 def process_and_speak(words, send=False):
     """
     Takes a list of words, optionally sends them to askGemini, and passes the response to the TTS endpoint.
@@ -578,13 +531,9 @@ def process_and_speak(words, send=False):
     headers = {"Content-Type": "application/json"}
 
     print(f"[TTS] Sending request with text: {gemini_response}")
-    response = requests.post(tts_url, json=payload, headers=headers)
-
-    if response.status_code == 200:
-        print("[TTS] Response:", response.json())
-    else:
-        print(f"[TTS] Failed with status code {response.status_code}")
-        print("[TTS] Response:", response.text)
+    
+    # Start the POST request in a new thread
+    threading.Thread(target=post_request, args=(tts_url, payload, headers)).start()
 
 
 # Init flags to hold the previous frames states
@@ -788,7 +737,7 @@ while True:
     if is_good_morning:
         cv2.putText(processed_frame, "Morning", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 255, 0), 3)
         if not previous_is_good_morning:
-            text_list.append("Good Morning")
+            text_list.append("Morning")
     else:
         cv2.putText(processed_frame, "Not Morning", (10, 80), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
     previous_is_good_morning = is_good_morning
@@ -834,14 +783,12 @@ while True:
         last_activity_time = time.time()
 
     if time.time() - last_activity_time > 3 and text_list:
-        process_and_speak(text_list)
+        process_and_speak(text_list, send=True)
         text_list = []
         last_activity_time = time.time() 
 
     # Debug print
     print(" ".join(text_list))
-    
-    # Pass the raw text into the large language model
 
     cv2.imshow("Image", processed_frame)
 
