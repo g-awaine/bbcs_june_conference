@@ -1,6 +1,11 @@
 import cv2
 import mediapipe as mp
 import numpy as np
+import time
+import requests
+import os
+import sys
+from gemini import askGemini
 
 new_frame_height = 640
 new_frame_width = 800
@@ -40,60 +45,60 @@ def calculate_angle(point1, point2, point3):
     return np.degrees(angle_rad)
 
 
-def is_eating_gesture(landmarks, hand_landmarks_list, elbow_id, shoulder_id, chest_point, face_nose_tip, face_proximity_threshold=0.4, min_shoulder_angle=60, max_shoulder_angle=95):
+# def is_eating_gesture(landmarks, hand_landmarks_list, elbow_id, shoulder_id, chest_point, face_nose_tip, face_proximity_threshold=0.4, min_shoulder_angle=60, max_shoulder_angle=95):
     # hand_landmarks_list will be a list of (x, y, z) tuples for all 21 hand landmarks
     # face_nose_tip will be an (x, y) tuple for the nose tip (no z for face detection)
 
-    def distance_2d(a, b):
-        # Calculate 2D distance for proximity check
-        return ((a[0] - b[0])**2 + (a[1] - b[1])**2) ** 0.5
+#     def distance_2d(a, b):
+#         # Calculate 2D distance for proximity check
+#         return ((a[0] - b[0])**2 + (a[1] - b[1])**2) ** 0.5
 
-    def distance_3d(a, b):
-        # Calculate 3D distance for hand gesture specifics
-        return ((a[0] - b[0])**2 + (a[1] - b[1])**2 + (a[2] - b[2])**2) ** 0.5
+#     def distance_3d(a, b):
+#         # Calculate 3D distance for hand gesture specifics
+#         return ((a[0] - b[0])**2 + (a[1] - b[1])**2 + (a[2] - b[2])**2) ** 0.5
 
-    # Check if we have enough landmarks for both hand and face
-    if len(hand_landmarks_list) < 21 or face_nose_tip is None:
-        return False
+#     # Check if we have enough landmarks for both hand and face
+#     if len(hand_landmarks_list) < 21 or face_nose_tip is None:
+#         return False
 
-    wrist = hand_landmarks_list[0]
-    index_tip = hand_landmarks_list[8]
-    thumb_tip = hand_landmarks_list[4]
-    middle_tip = hand_landmarks_list[12]
+#     wrist = hand_landmarks_list[0]
+#     index_tip = hand_landmarks_list[8]
+#     thumb_tip = hand_landmarks_list[4]
+#     middle_tip = hand_landmarks_list[12]
     
-    thumb_index_dist = distance_3d(thumb_tip, index_tip)
-    index_middle_dist = distance_3d(index_tip, middle_tip)
-    wrist_to_index = distance_3d(wrist, index_tip)
+#     thumb_index_dist = distance_3d(thumb_tip, index_tip)
+#     index_middle_dist = distance_3d(index_tip, middle_tip)
+#     wrist_to_index = distance_3d(wrist, index_tip)
 
-    # Check if hand is near the face (using wrist as the reference for the hand, and only 2D for face)
-    # We pass only x,y for wrist to distance_2d
-    hand_to_face_dist = distance_2d((wrist[0], wrist[1]), face_nose_tip)
-    is_near_face = hand_to_face_dist < face_proximity_threshold # Adjust this threshold as needed
+#     # Check if hand is near the face (using wrist as the reference for the hand, and only 2D for face)
+#     # We pass only x,y for wrist to distance_2d
+#     hand_to_face_dist = distance_2d((wrist[0], wrist[1]), face_nose_tip)
+#     is_near_face = hand_to_face_dist < face_proximity_threshold # Adjust this threshold as needed
 
 
-    elbow = landmarks[elbow_id]
-    shoulder = landmarks[shoulder_id]
+    # elbow = landmarks[elbow_id]
+    # shoulder = landmarks[shoulder_id]
 
-    elbow_xyz = np.array([elbow.x, elbow.y, elbow.z])
-    shoulder_xyz = np.array([shoulder.x, shoulder.y, shoulder.z])
-    hip_xyz = np.array([shoulder.x, new_frame_height, shoulder.z])
+    # elbow_xyz = np.array([elbow.x, elbow.y, elbow.z])
+    # shoulder_xyz = np.array([shoulder.x, shoulder.y, shoulder.z])
+    # hip_xyz = np.array([shoulder.x, new_frame_height, shoulder.z])
 
-    vertical_diff = chest_point[1] - index_tip[1]
-    is_above_chest = 0 < vertical_diff < 2
+    # vertical_diff = chest_point[1] - index_tip[1]
+    # is_above_chest = 0 < vertical_diff < 2
 
-    shoulder_angle = calculate_angle(hip_xyz, shoulder_xyz, elbow_xyz)
-    is_shoulder_angled = min_shoulder_angle < shoulder_angle < max_shoulder_angle
+    # shoulder_angle = calculate_angle(hip_xyz, shoulder_xyz, elbow_xyz)
+    # is_shoulder_angled = min_shoulder_angle < shoulder_angle < max_shoulder_angle
 
     
-    # Combined conditions for eating gesture
-    return (
-        thumb_index_dist < 0.16 and
-        index_middle_dist < 0.16 and
-        wrist_to_index < 0.24 and
-        is_near_face and
-        is_above_chest and
-        is_shoulder_angled
-    )
+    # # Combined conditions for eating gesture
+    # return (
+    #     thumb_index_dist < 0.16 and
+    #     index_middle_dist < 0.16 and
+    #     wrist_to_index < 0.24 and
+    #     is_near_face and
+    #     is_above_chest and
+    #     is_shoulder_angled
+    # )
 
 class PointChestGesture():
     def __init__(self):
@@ -229,7 +234,6 @@ class HappyGesture():
         is_shoulder_angled = min_shoulder_angle < shoulder_angle < max_shoulder_angle
         return dist_index_finger_to_shoulder < dist_threshold and is_shoulder_angled
     
-
 class BreakfastGesture():
     def __init__(self):
         self.phase = 0
@@ -262,7 +266,6 @@ class BreakfastGesture():
         # If phase is 0 (didnt identify the first up position) then make waiting count 0
         elif self.phase == 0:
             self.waiting_count = 0
-
 
         # Check if waiting_count exceeds the waiting frames that is allowed
         if self.waiting_count > 30:
@@ -343,7 +346,6 @@ class BreakfastGesture():
 
         return dist_index_finger_to_chest < dist_threshold and is_shoulder_angled and is_below_chest
 
-
 class SatayGesture():
     def __init__(self):
         self.phase = 0
@@ -376,7 +378,6 @@ class SatayGesture():
         # If phase is 0 (didnt identify the first up position) then make waiting count 0
         elif self.phase == 0:
             self.waiting_count = 0
-
 
         # Check if waiting_count exceeds the waiting frames that is allowed
         if self.waiting_count > 60:
@@ -444,21 +445,134 @@ class SatayGesture():
 
         return dist_index_finger_to_outer_pos < dist_threshold and is_shoulder_angled and is_outer
 
+class EatingGesture():
+    def __init__(self):
+        self.is_eating_detected = False
+        self.consecutive_frames = 0
+        self.required_consecutive_frames = 7 # Adjust as needed (e.g., 15-30 frames)
+        self.last_detection_frame = 0
+
+    def reinitialise(self):
+        self.is_eating_detected = False
+        self.consecutive_frames = 0
+        self.last_detection_frame = 0
+
+    def _check_eating_condition(self, hand_landmarks_list, face_nose_tip, face_proximity_threshold=0.3):
+        # hand_landmarks_list will be a list of (x, y, z) tuples for all 21 hand landmarks
+        # face_nose_tip will be an (x, y) tuple for the nose tip (no z for face detection)
+
+        def distance_2d(a, b):
+            # Calculate 2D distance for proximity check
+            return ((a[0] - b[0])**2 + (a[1] - b[1])**2) ** 0.5
+
+        def distance_3d(a, b):
+            # Calculate 3D distance for hand gesture specifics
+            return ((a[0] - b[0])**2 + (a[1] - b[1])**2 + (a[2] - b[2])**2) ** 0.5
+
+        # Check if we have enough landmarks for both hand and face
+        if len(hand_landmarks_list) < 21 or face_nose_tip is None:
+            return False
+
+        wrist = hand_landmarks_list[0]
+        index_tip = hand_landmarks_list[8]
+        thumb_tip = hand_landmarks_list[4]
+        middle_tip = hand_landmarks_list[12]
+        
+        thumb_index_dist = distance_3d(thumb_tip, index_tip)
+        index_middle_dist = distance_3d(index_tip, middle_tip)
+        wrist_to_index = distance_3d(wrist, index_tip)
+
+        # Check if hand is near the face (using wrist as the reference for the hand, and only 2D for face)
+        # We pass only x,y for wrist to distance_2d
+        hand_to_face_dist = distance_2d((wrist[0], wrist[1]), face_nose_tip)
+        is_near_face = hand_to_face_dist < face_proximity_threshold # Adjust this threshold as needed
+
+        # Combined conditions for eating gesture
+        return (
+            thumb_index_dist < 0.05 and
+            index_middle_dist < 0.05 and
+            wrist_to_index < 0.12 and
+            is_near_face
+        )
+
+    def check_frame(self, frame_count, hand_landmarks_list, face_nose_tip):
+        current_eating_condition = self._check_eating_condition(hand_landmarks_list, face_nose_tip)
+
+        if current_eating_condition:
+            self.consecutive_frames += 1
+            self.last_detection_frame = frame_count
+            if self.consecutive_frames >= self.required_consecutive_frames:
+                if not self.is_eating_detected:
+                    self.is_eating_detected = True
+                    print("Eating Gesture Detected!")
+                    return True
+        else:
+            # If the gesture is broken, reset the counter
+            if self.consecutive_frames > 0 and frame_count - self.last_detection_frame > 5: # Small buffer for transient drops
+                self.reinitialise()
+            elif self.consecutive_frames > 0: # Still within buffer, don't reset yet
+                 pass
+            else: # Not detected, and no consecutive frames to reset
+                 self.reinitialise()
+
+        return False
+
+
 # Initialise PointChestGesture
 left_point_gesture = PointChestGesture()
 right_point_gesture = PointChestGesture()
-        
 # Initialise MorningGesture object
 morning_gesture = MorningGesture()
-
 # Initialise HappyGesture object
 happy_gesture = HappyGesture()
-
 # Initialise BreakfastGesture object
 breakfast_gesture = BreakfastGesture()
-
 # Initialise SatayGesture object
 satay_gesture = SatayGesture()
+# Initialise EatingGesture object
+eating_gesture = EatingGesture()
+
+def process_and_speak(words, send=False):
+    """
+    Takes a list of words, optionally sends them to askGemini, and passes the response to the TTS endpoint.
+    
+    Args:
+        words (list of str): The list of input words.
+        send (bool): Whether to actually send to Gemini and TTS. If False, only prints what would be done.
+    """
+    if not words:
+        print("No words provided.")
+        return
+
+    input_text = " ".join(words)
+    print(f"[Gemini] Prepared input: {input_text}")
+    
+    if not send:
+        print("[DEBUG] Skipping Gemini and TTS calls (send=False).")
+        return
+
+    gemini_response = askGemini(input_text)
+    
+    if not gemini_response:
+        print("Gemini response is empty. Exiting.")
+        return
+
+    print(f"[Gemini] Response received: {gemini_response}")
+
+    # Prepare TTS request
+    tts_url = "http://localhost:5001/speak"
+    payload = {"text": gemini_response}
+    headers = {"Content-Type": "application/json"}
+
+    print(f"[TTS] Sending request with text: {gemini_response}")
+    response = requests.post(tts_url, json=payload, headers=headers)
+
+    if response.status_code == 200:
+        print("[TTS] Response:", response.json())
+    else:
+        print(f"[TTS] Failed with status code {response.status_code}")
+        print("[TTS] Response:", response.text)
+
 
 # Init flags to hold the previous frames states
 previous_pointing = False
@@ -473,6 +587,8 @@ if not cap.isOpened():
     exit()
 else:
     pass
+
+last_activity_time = time.time()
 
 while True:
     ret, frame = cap.read()
@@ -534,9 +650,6 @@ while True:
             (left_mouth.y + right_mouth.y) / 2,
             (left_mouth.z + right_mouth.z) / 2,
         ])
-
-
-
         
         required_landmarks = [
             mp_pose.PoseLandmark.RIGHT_WRIST,
@@ -603,8 +716,8 @@ while True:
 
             # Pass both hand_points and face_nose_tip to the eating gesture function
             # The is_eating_gesture function now handles 2D vs 3D distances internally
-            if is_eating_gesture(landmarks, hand_points,mp_pose.PoseLandmark.RIGHT_ELBOW, mp_pose.PoseLandmark.RIGHT_SHOULDER, chest_center, face_nose_tip):
-                is_eating = True # Set the flag if eating gesture is detected
+            # if is_eating_gesture(landmarks, hand_points,mp_pose.PoseLandmark.RIGHT_ELBOW, mp_pose.PoseLandmark.RIGHT_SHOULDER, chest_center, face_nose_tip):
+            #     is_eating = True # Set the flag if eating gesture is detected
 
             if hand_label == 'Right':
                 required = [mp_pose.PoseLandmark.LEFT_ELBOW, mp_pose.PoseLandmark.LEFT_SHOULDER]
@@ -689,7 +802,7 @@ while True:
         if not previous_is_eating:
             text_list.append("Eat")
     else:
-        cv2.putText(processed_frame, "Not Eating", (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,0,255), 3)
+        cv2.putText(processed_frame, "Not Eating", (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
     previous_is_eating = is_eating
 
     # SATAY
@@ -700,12 +813,18 @@ while True:
     else:
         cv2.putText(processed_frame, "Not Satay", (10, 240), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
     previous_is_satay = is_satay
+    
+    activity_this_frame = any([left_pointing, right_pointing, is_good_morning, is_happy, is_eating, is_breakfast, is_satay])
+    if activity_this_frame:
+        last_activity_time = time.time()
+
+    if time.time() - last_activity_time > 3 and text_list:
+        process_and_speak(text_list)
+        text_list = []
+        last_activity_time = time.time() 
 
     # Debug print
     print(" ".join(text_list))
-
-
-    previous_pointing = left_pointing or right_pointing
     
     # Pass the raw text into the large language model
 
