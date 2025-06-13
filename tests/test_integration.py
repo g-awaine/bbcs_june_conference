@@ -9,7 +9,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from gemini import askGemini
 # Testing without SgSL portion for now
 
-LIST_OF_WORDS = ["I","eat","breakfast","breakfast"]
+LIST_OF_WORDS = ["I","eat","I", "I", "breakfast","breakfast", "satay"]
 
 # Now define the TTS service
 def test_tts(gemini_response):
