@@ -186,7 +186,7 @@ class BreakfastGesture():
         self.phase = 0
         self.waiting_count = 0
 
-    def check_frame(self, frame_count, landmarks, index_finger_id, elbow_id, shoulder_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold=0.18, min_shoulder_angle=0, max_shoulder_angle=20):
+    def check_frame(self, frame_count, landmarks, index_finger_id, elbow_id, shoulder_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold=0.2, min_shoulder_angle=0, max_shoulder_angle=40):
         is_up_position = self.identify_up_position(landmarks, index_finger_id, elbow_id, shoulder_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold, min_shoulder_angle, max_shoulder_angle)
         is_down_position = self.identify_down_position(landmarks, index_finger_id, elbow_id, shoulder_id, mouth_right_id, mouth_left_id, chest_point, dist_threshold, min_shoulder_angle, max_shoulder_angle)
 
@@ -329,7 +329,7 @@ class SatayGesture():
             self.reinitialise()
 
         # Check if the phase is 5 (meaning the full gesture was accomplished)
-        if self.phase == 3:
+        if self.phase == 4:
             print("Satay was detected-----------------------------------")
             self.reinitialise()
             return True
@@ -445,15 +445,15 @@ class EatingGesture():
 
         # Combined conditions for eating gesture
         return (
-            thumb_index_dist < 0.16 and
-            index_middle_dist < 0.16 and
-            wrist_to_index < 0.24 and
+            thumb_index_dist < 0.18 and
+            index_middle_dist < 0.18 and
+            wrist_to_index < 0.26 and
             is_near_face and
             is_above_chest and
             is_shoulder_angled
         )
 
-    def check_frame(self, frame_count, landmarks, hand_landmarks_list, elbow_id, shoulder_id, chest_point, face_nose_tip, face_proximity_threshold=0.4, min_shoulder_angle=45, max_shoulder_angle=95):
+    def check_frame(self, frame_count, landmarks, hand_landmarks_list, elbow_id, shoulder_id, chest_point, face_nose_tip, face_proximity_threshold=0.4, min_shoulder_angle=25, max_shoulder_angle=95):
         current_eating_condition = self._check_eating_condition(landmarks, hand_landmarks_list, elbow_id, shoulder_id, chest_point, face_nose_tip, face_proximity_threshold, min_shoulder_angle, max_shoulder_angle)
 
         if current_eating_condition:
