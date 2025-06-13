@@ -5,6 +5,7 @@ import torch
 import sounddevice as sd
 import textwrap
 import asyncio
+import threading
 
 class TTSService:
     def __init__(self, lang_code='a', voice='af_heart', samplerate=24000):
@@ -24,10 +25,15 @@ class TTSService:
             generator = self.pipeline(chunk, voice=self.voice)
             for i, (gs, ps, audio) in enumerate(generator):
                 print(f"Playing segment {i}: {gs}, {ps}")
-                # Blocking playback to ensure sound is played before continuing
                 sd.play(audio.cpu().numpy(), samplerate=self.samplerate, blocking=True)
-                # yield to event loop to keep API responsive
                 await asyncio.sleep(0)
+
+#  Runs async `speak` in a thread
+def speak_in_thread(text):
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(tts.speak(text))
+    loop.close()
 
 app = FastAPI()
 tts = TTSService()
@@ -37,8 +43,10 @@ class TextRequest(BaseModel):
 
 @app.post("/speak")
 async def speak_text(req: TextRequest):
-    await tts.speak(req.text)
-    return {"status": "ok", "message": "spoken"}
+    thread = threading.Thread(target=speak_in_thread, args=(req.text,))
+    thread.start()
+    return {"status": "ok", "message": "speaking started"}
+
 
 if __name__ == "__main__":
     import uvicorn
