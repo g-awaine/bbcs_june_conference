@@ -115,7 +115,7 @@ class PointChestGesture():
         else:
             self.reinitialise()
 
-        if self.waiting_count >= 6:
+        if self.waiting_count >= 8:
             return True
         else:
             return False
@@ -195,7 +195,7 @@ class HappyGesture():
         self.count = 0
         self.happy_detected = False
     
-    def check_frame(self, frame_count, landmarks, hand_points, index_finger_id, elbow_id, shoulder_id, dist_threshold=0.1, min_shoulder_angle=20, max_shoulder_angle=70):
+    def check_frame(self, frame_count, landmarks, hand_points, index_finger_id, elbow_id, shoulder_id, dist_threshold=0.08, min_shoulder_angle=20, max_shoulder_angle=70):
         is_happy = self.identify_happy_gesture(landmarks, hand_points, index_finger_id, elbow_id, shoulder_id, dist_threshold, min_shoulder_angle, max_shoulder_angle)
 
         if self.happy_detected == True and is_happy == True:
@@ -207,14 +207,12 @@ class HappyGesture():
     
         elif self.found_start_frame and is_happy:
             self.count += 1
-            if self.count >= 12:
-                print("happy detected")
+            if self.count >= 15:
                 self.happy_detected = True
                 return True
 
         elif self.found_start_frame and not is_happy:
             self.reinitialise()
-            print("lost it", frame_count)
 
         return False
 
@@ -449,7 +447,7 @@ class EatingGesture():
     def __init__(self):
         self.is_eating_detected = False
         self.consecutive_frames = 0
-        self.required_consecutive_frames = 7 # Adjust as needed (e.g., 15-30 frames)
+        self.required_consecutive_frames = 0 # Adjust as needed (e.g., 15-30 frames)
         self.last_detection_frame = 0
 
     def reinitialise(self):
@@ -457,7 +455,7 @@ class EatingGesture():
         self.consecutive_frames = 0
         self.last_detection_frame = 0
 
-    def _check_eating_condition(self, hand_landmarks_list, face_nose_tip, face_proximity_threshold=0.3):
+    def _check_eating_condition(self, landmarks, hand_landmarks_list, elbow_id, shoulder_id, chest_point, face_nose_tip, face_proximity_threshold, min_shoulder_angle, max_shoulder_angle):
         # hand_landmarks_list will be a list of (x, y, z) tuples for all 21 hand landmarks
         # face_nose_tip will be an (x, y) tuple for the nose tip (no z for face detection)
 
@@ -487,16 +485,31 @@ class EatingGesture():
         hand_to_face_dist = distance_2d((wrist[0], wrist[1]), face_nose_tip)
         is_near_face = hand_to_face_dist < face_proximity_threshold # Adjust this threshold as needed
 
+        elbow = landmarks[elbow_id]
+        shoulder = landmarks[shoulder_id]
+
+        elbow_xyz = np.array([elbow.x, elbow.y, elbow.z])
+        shoulder_xyz = np.array([shoulder.x, shoulder.y, shoulder.z])
+        hip_xyz = np.array([shoulder.x, new_frame_height, shoulder.z])
+
+        vertical_diff = chest_point[1] - index_tip[1] - 0.1
+        is_above_chest = vertical_diff > 0 
+
+        shoulder_angle = calculate_angle(hip_xyz, shoulder_xyz, elbow_xyz)
+        is_shoulder_angled = min_shoulder_angle < shoulder_angle < max_shoulder_angle
+
         # Combined conditions for eating gesture
         return (
-            thumb_index_dist < 0.05 and
-            index_middle_dist < 0.05 and
-            wrist_to_index < 0.12 and
-            is_near_face
+            thumb_index_dist < 0.16 and
+            index_middle_dist < 0.16 and
+            wrist_to_index < 0.24 and
+            is_near_face and
+            is_above_chest and
+            is_shoulder_angled
         )
 
-    def check_frame(self, frame_count, hand_landmarks_list, face_nose_tip):
-        current_eating_condition = self._check_eating_condition(hand_landmarks_list, face_nose_tip)
+    def check_frame(self, frame_count, landmarks, hand_landmarks_list, elbow_id, shoulder_id, chest_point, face_nose_tip, face_proximity_threshold=0.4, min_shoulder_angle=60, max_shoulder_angle=95):
+        current_eating_condition = self._check_eating_condition(landmarks, hand_landmarks_list, elbow_id, shoulder_id, chest_point, face_nose_tip, face_proximity_threshold, min_shoulder_angle, max_shoulder_angle)
 
         if current_eating_condition:
             self.consecutive_frames += 1
@@ -716,8 +729,10 @@ while True:
 
             # Pass both hand_points and face_nose_tip to the eating gesture function
             # The is_eating_gesture function now handles 2D vs 3D distances internally
-            # if is_eating_gesture(landmarks, hand_points,mp_pose.PoseLandmark.RIGHT_ELBOW, mp_pose.PoseLandmark.RIGHT_SHOULDER, chest_center, face_nose_tip):
-            #     is_eating = True # Set the flag if eating gesture is detected
+            required = [mp_pose.PoseLandmark.RIGHT_ELBOW, mp_pose.PoseLandmark.RIGHT_SHOULDER]
+            if check_landmarks(landmarks, required):
+                if eating_gesture.check_frame(frame_count, landmarks, hand_points,mp_pose.PoseLandmark.RIGHT_ELBOW, mp_pose.PoseLandmark.RIGHT_SHOULDER, chest_center, face_nose_tip):
+                    is_eating = True # Set the flag if eating gesture is detected
 
             if hand_label == 'Right':
                 required = [mp_pose.PoseLandmark.LEFT_ELBOW, mp_pose.PoseLandmark.LEFT_SHOULDER]
@@ -798,11 +813,11 @@ while True:
 
     # EATING
     if is_eating:
-        cv2.putText(processed_frame, "Eating Gesture Detected", (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 3)
+        cv2.putText(processed_frame, "Eating", (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 3)
         if not previous_is_eating:
             text_list.append("Eat")
     else:
-        cv2.putText(processed_frame, "Not Eating", (10, 160), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
+        cv2.putText(processed_frame, "Not Eating", (10, 200), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (0, 0, 255), 3)
     previous_is_eating = is_eating
 
     # SATAY
