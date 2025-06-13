@@ -22,6 +22,25 @@ Finally, since the voice output lacked a local identity, we fine-tuned the model
 
 ---
 
+# Getting Started
+
+1. Ensure all required dependencies are installed before running:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+2. Start the application and enable text-to-speech:
+
+    ```bash
+    python app.py
+    python tts.py
+    ```
+
+# Data Sets
+
+1. https://huggingface.co/datasets/mesolitica/IMDA-TTS
+
 # Team Members
 
 - Gawain
